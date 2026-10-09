@@ -17,9 +17,9 @@ Run `python -m http.server 8000` from this directory. Open `http://localhost:800
 
 GitHub Pages uses the workflow in `.github/workflows/pages.yml`. Edits pushed to `main` are published automatically. `scripts/prepare-pages.py` prepares the existing HTML and replaces source metadata with the configured publishing URL. The original source retains `mdihni.com` and `contact@mdihni.com`.
 
-The source `CNAME` is a reference for the intended domain. It is excluded from the Pages artifact: GitHub Pages stays on its GitHub URL until a custom domain is configured in Pages settings. No STRATO DNS or mail records are changed by this workflow.
+The live custom domain is `https://mdihni.com/`, with Dutch at `/nl/`. `www.mdihni.com` redirects to the main domain. GitHub Pages manages HTTPS and automatic certificate renewal. The source `CNAME` is excluded from the workflow artifact; the custom domain is configured in GitHub Pages settings. No STRATO DNS or mail records are changed by this workflow.
 
-When connecting mdihni.com, preserve the existing STRATO MX, SPF, DKIM, DMARC and mail host records. No nameserver change is needed merely to connect web hosting.
+The domain was connected on 9 October 2026 by changing only STRATO's A, AAAA and www CNAME web records and adding GitHub domain-verification TXT. STRATO nameservers, MX, SPF, DKIM, DMARC and mail settings were preserved. See `STRATO-DOMAIN-GUIDE.md` in the delivery folder. During initial certificate provisioning, the publishing script normalizes GitHub's temporary HTTP address for this verified domain to HTTPS metadata.
 
 ## Content and artwork
 
