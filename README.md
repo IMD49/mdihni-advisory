@@ -3,11 +3,11 @@
 Editable static website, improved from the original Mdihni-Advisory-Website project.
 
 - English pages in the root; full Dutch translations in `nl/`.
-- Shared styling in `assets/styles.css`, `assets/refinements.css`, `assets/theme-dark.css`.
+- Shared styling in `assets/styles.css`, `assets/refinements.css`, `assets/theme-dark.css`, `assets/polish.css`.
 - Accessible language links work without JavaScript, cookies or browser storage.
 - The email composer opens the visitor's email application or copies a message. It does not send or store submissions.
 - Local fonts and optimized imagery; no external trackers or runtime libraries.
-- Subtle entry and scroll motion respects the reduced-motion device preference.
+- Layered entry, staggered reveals, pointer depth, gentle parallax and native page transitions respect the reduced-motion device preference. See `POLISH-NL.md` for edition 5 design and validation.
 
 ## Run locally
 
