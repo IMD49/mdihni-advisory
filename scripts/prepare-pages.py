@@ -11,6 +11,9 @@ import os, re, shutil
 root=Path(__file__).resolve().parents[1]
 target=root/'_site'
 base=os.environ.get('PAGES_BASE_URL','https://mdihni.com').rstrip('/')
+# Pages reports HTTP for a newly connected domain until SSL is provisioned.
+# Keep our verified custom domain's metadata on its intended HTTPS address.
+if base=='http://mdihni.com':base='https://mdihni.com'
 if not base.startswith('https://'):raise SystemExit('Expected an HTTPS publishing address')
 target.mkdir(exist_ok=True)
 for folder in ('assets','nl'):
