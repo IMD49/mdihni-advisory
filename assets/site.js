@@ -3,6 +3,7 @@
   'use strict';
   const nl = document.documentElement.lang === 'nl';
   const t = (en, dutch) => nl ? dutch : en;
+  let smoothScroll;
   const menuBtn = document.querySelector('.menu-toggle');
   const mobile = document.getElementById('mobile-menu');
   const main = document.querySelector('main');
@@ -10,6 +11,8 @@
   if (menuBtn && mobile) {
     const setMenu = (open, restore = false) => {
       document.body.classList.toggle('menu-open', open);
+      if (open) smoothScroll?.stop();
+      else smoothScroll?.start();
       menuBtn.setAttribute('aria-expanded', String(open));
       menuBtn.setAttribute('aria-label', open ? t('Close menu', 'Menu sluiten') : t('Open menu', 'Menu openen'));
       mobile.inert = !open;
@@ -37,124 +40,158 @@
   const year = document.getElementById('year');
   if (year) year.textContent = new Date().getFullYear();
   const header = document.querySelector('.site-header');
-  let scrollPending = false;
-  window.addEventListener('scroll', () => {
-    if (scrollPending) return;
-    scrollPending = true;
-    requestAnimationFrame(() => { header?.classList.toggle('is-scrolled', window.scrollY > 12); scrollPending = false; });
-  }, { passive: true });
   const reducedMotion = window.matchMedia('(prefers-reduced-motion:reduce)');
-  const revealElements = [...document.querySelectorAll('.section-heading,.section-head-row,.three-pillar article,.service-tile,.approach-layout,.about-teaser-grid,.cta-inner,.detail-card,.method-list article,.values-grid article,.contact-info,.contact-panel,.approach-steps>div,.engagement-principles article,.founding-note,.first-conversation')];
+  const root = document.documentElement;
+  const beginEntry = () => {
+    root.classList.remove('motion-pending');
+    if (reducedMotion.matches) return;
+    root.classList.add('motion-ready', 'entry-in-progress');
+    window.setTimeout(() => root.classList.remove('entry-in-progress'), 1600);
+  };
+  // Wait for the actual fonts before animating text; avoid a font swap mid-motion.
+  Promise.all([document.fonts.load('600 64px Manrope'), document.fonts.load('italic 500 64px Cormorant')])
+    .then(() => document.fonts.ready).catch(() => {}).then(beginEntry);
+  // Reveal text and cards individually, rather than moving whole sections and their children twice.
+  const revealCandidates = [...document.querySelectorAll('.section-heading,.section-head-row,.three-pillar article,.service-tile,.approach-layout>div:first-child,.about-teaser-text,.cta-inner,.detail-card,.method-list article,.values-grid article,.contact-info,.contact-panel,.approach-steps>div,.founding-note,.first-conversation')];
+  const revealElements = revealCandidates.filter(element => !revealCandidates.some(parent => parent !== element && parent.contains(element)));
   document.querySelectorAll('.three-pillar,.services-grid,.approach-steps,.values-grid,.method-list,.engagement-principles').forEach(group => {
     [...group.children].forEach((item, index) => item.style.setProperty('--reveal-delay', `${Math.min(index * 70, 210)}ms`));
   });
   let revealObserver;
+  let warmObserver;
   if (!reducedMotion.matches && 'IntersectionObserver' in window) {
+    warmObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting && entry.target.classList.contains('reveal-pending')) entry.target.classList.add('motion-prepared');
+      else if (!entry.isIntersecting) entry.target.classList.remove('motion-prepared');
+    }), { rootMargin: '200px 0px' });
     revealObserver = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) {
+        entry.target.classList.add('motion-prepared');
         entry.target.classList.add('is-visible');
         entry.target.classList.remove('reveal-pending');
         revealObserver.unobserve(entry.target);
       }
-    }), { threshold: 0.08 });
+    }), { threshold: 0.02 });
     revealElements.forEach(element => {
       if (element.getBoundingClientRect().top < window.innerHeight) { element.classList.add('is-visible'); return; }
       element.classList.add('reveal','reveal-pending');
+      warmObserver.observe(element);
       revealObserver.observe(element);
+      element.addEventListener('transitionend', event => {
+        if (event.target === element && event.propertyName === 'transform') {
+          element.classList.remove('motion-prepared');
+          warmObserver.unobserve(element);
+        }
+      });
     });
   }
   const showAll = () => revealElements.forEach(element => {
-    element.classList.remove('reveal-pending'); element.classList.add('is-visible');
+    element.classList.remove('reveal-pending', 'motion-prepared'); element.classList.add('is-visible');
   });
-  reducedMotion.addEventListener('change', event => { if (event.matches) { showAll(); revealObserver?.disconnect(); } });
+  reducedMotion.addEventListener('change', event => {
+    if (event.matches) {
+      root.classList.remove('motion-pending', 'entry-in-progress');
+      showAll(); revealObserver?.disconnect(); warmObserver?.disconnect();
+    }
+  });
   window.addEventListener('beforeprint', showAll);
   window.addEventListener('pageshow', event => { if (event.persisted) showAll(); });
-  const scene = document.querySelector('.perspective-scene');
-  if (scene) {
-    if ('IntersectionObserver' in window) {
-      new IntersectionObserver(entries => scene.classList.toggle('scene-inactive', !entries[0].isIntersecting)).observe(scene);
-    }
-    document.addEventListener('visibilitychange', () => scene.classList.toggle('scene-inactive', document.hidden));
-  }
-  // Motion responds to real input. No idle animation loop, no scroll hijacking.
+  // A single passive scroll update, with stable artwork and no per-frame layout reads.
   const finePointer = window.matchMedia('(hover:hover) and (pointer:fine)');
-  const hero = document.querySelector('.home-hero-dark');
-  const media = document.querySelector('.about-media');
-  const progress = document.querySelector('.reading-progress');
-  let motionFrame = 0;
+  const progress = document.querySelector('.reading-progress span');
+  let motionFrame = 0, scrollLimit = 0;
   const refreshMotion = () => {
     motionFrame = 0;
     if (document.hidden) return;
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    const ratio = max > 0 ? Math.max(0, Math.min(1, window.scrollY / max)) : 0;
-    const heroRect = hero?.getBoundingClientRect();
-    const mediaRect = media?.getBoundingClientRect();
-    const enabled = !reducedMotion.matches && finePointer.matches;
-    progress?.style.setProperty('--read-progress', ratio.toFixed(4));
-    document.body.classList.toggle('motion-enhanced', enabled);
-    if (scene) {
-      const offset = enabled && heroRect && heroRect.bottom > 0 ? Math.min(18, Math.max(0, -heroRect.top * .04)) : 0;
-      scene.style.setProperty('--scene-scroll', `${offset.toFixed(2)}px`);
-    }
-    if (media && mediaRect) {
-      const visible = mediaRect.top < window.innerHeight && mediaRect.bottom > 0;
-      const shift = enabled && visible ? Math.max(-9, Math.min(9, (mediaRect.top - window.innerHeight * .45) * .025)) : 0;
-      media.style.setProperty('--media-shift', `${shift.toFixed(2)}px`);
-    }
+    header?.classList.toggle('is-scrolled', window.scrollY > 12);
+    const ratio = scrollLimit > 0 ? Math.max(0, Math.min(1, window.scrollY / scrollLimit)) : 0;
+    if (progress) progress.style.transform = `scaleX(${ratio.toFixed(4)})`;
   };
   const requestMotion = () => { if (!motionFrame) motionFrame = requestAnimationFrame(refreshMotion); };
+  const measurePage = () => {
+    scrollLimit = document.documentElement.scrollHeight - window.innerHeight;
+    requestMotion();
+  };
   window.addEventListener('scroll', requestMotion, { passive: true });
-  window.addEventListener('resize', requestMotion, { passive: true });
-  window.addEventListener('pageshow', requestMotion);
-  document.addEventListener('visibilitychange', requestMotion);
-  reducedMotion.addEventListener('change', requestMotion);
-  finePointer.addEventListener('change', requestMotion);
-  if ('ResizeObserver' in window) new ResizeObserver(requestMotion).observe(document.body);
-  requestMotion();
-  if (hero && scene) {
-    let heroFrame = 0, pointerX = 0, pointerY = 0;
-    hero.addEventListener('pointermove', event => {
-      if (reducedMotion.matches || !finePointer.matches || event.pointerType !== 'mouse') return;
-      const rect = hero.getBoundingClientRect();
-      pointerX = ((event.clientX - rect.left) / rect.width - .5) * -8;
-      pointerY = ((event.clientY - rect.top) / rect.height - .5) * -6;
-      if (!heroFrame) heroFrame = requestAnimationFrame(() => {
-        heroFrame = 0;
-        scene.style.setProperty('--scene-x', `${pointerX.toFixed(2)}px`);
-        scene.style.setProperty('--scene-y', `${pointerY.toFixed(2)}px`);
-      });
-    }, { passive: true });
-    const resetHero = () => {
-      cancelAnimationFrame(heroFrame); heroFrame = 0;
-      scene.style.removeProperty('--scene-x');scene.style.removeProperty('--scene-y');
-    };
-    hero.addEventListener('pointerleave', resetHero);
-    reducedMotion.addEventListener('change', resetHero);
-    finePointer.addEventListener('change', resetHero);
-  }
-  document.querySelectorAll('.service-tile').forEach(card => {
-    let frame = 0, rect, x = 0, y = 0;
-    const reset = () => {
-      cancelAnimationFrame(frame);frame = 0;rect = null;
-      ['--glow-x','--glow-y','--tilt-x','--tilt-y'].forEach(key => card.style.removeProperty(key));
-    };
-    card.addEventListener('pointerenter', () => { rect = card.getBoundingClientRect(); });
-    card.addEventListener('pointermove', event => {
-      if (reducedMotion.matches || !finePointer.matches || event.pointerType !== 'mouse' || !rect) return;
-      x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-      y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
-      if (!frame) frame = requestAnimationFrame(() => {
-        frame = 0;
-        card.style.setProperty('--glow-x', `${x.toFixed(1)}px`);
-        card.style.setProperty('--glow-y', `${y.toFixed(1)}px`);
-        card.style.setProperty('--tilt-x', `${((.5-y/rect.height)*2).toFixed(2)}deg`);
-        card.style.setProperty('--tilt-y', `${((x/rect.width-.5)*2).toFixed(2)}deg`);
-      });
-    }, { passive: true });
-    card.addEventListener('pointerleave', reset);
-    reducedMotion.addEventListener('change', reset);
-    finePointer.addEventListener('change', reset);
+  window.addEventListener('resize', measurePage, { passive: true });
+  window.addEventListener('pageshow', measurePage);
+  if ('ResizeObserver' in window) new ResizeObserver(measurePage).observe(document.body);
+  measurePage();
+
+  // Lenis uses native scroll positions and time-based damping. Run its clock only
+  // during actual wheel/anchor movement; leave touch, keyboard and nested controls native.
+  let scrollFrame = 0, scrollClock = 0, lastScrollTime = 0;
+  const advanceScroll = time => {
+    scrollFrame = 0;
+    if (!smoothScroll || document.hidden) return;
+    // Keep the clock continuous across input, not across idle time. Otherwise
+    // a long pause would be interpreted as one huge frame on the next wheel tick.
+    scrollClock += lastScrollTime ? Math.min(32, Math.max(0, time - lastScrollTime)) : 0;
+    lastScrollTime = time;
+    smoothScroll.raf(scrollClock);
+    if (smoothScroll.isScrolling === 'smooth') scrollFrame = requestAnimationFrame(advanceScroll);
+    else lastScrollTime = 0;
+  };
+  const wakeScroll = () => {
+    if (!scrollFrame && !document.hidden) scrollFrame = requestAnimationFrame(advanceScroll);
+  };
+  const stopAtCurrentPosition = () => {
+    cancelAnimationFrame(scrollFrame); scrollFrame = 0; lastScrollTime = 0;
+    smoothScroll?.scrollTo(window.scrollY, { immediate: true, force: true });
+  };
+  const configureScroll = () => {
+    stopAtCurrentPosition();
+    smoothScroll?.destroy(); smoothScroll = undefined;
+    scrollClock = 0;
+    document.body.classList.toggle('motion-enhanced', !reducedMotion.matches && finePointer.matches);
+    if (reducedMotion.matches || !finePointer.matches || typeof window.Lenis !== 'function') return;
+    smoothScroll = new window.Lenis({
+      autoRaf: false, lerp: 0.11, smoothWheel: true, syncTouch: false,
+      stopInertiaOnNavigate: true, anchors: false,
+      prevent: node => node.matches('textarea,select,input,[contenteditable],.mobile-nav,[data-native-scroll]')
+    });
+    smoothScroll.on('virtual-scroll', wakeScroll);
+    if (document.body.classList.contains('menu-open')) smoothScroll.stop();
+  };
+  configureScroll();
+  reducedMotion.addEventListener('change', configureScroll);
+  finePointer.addEventListener('change', configureScroll);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopAtCurrentPosition();
+    else { smoothScroll?.resize(); measurePage(); }
   });
+  window.addEventListener('pagehide', stopAtCurrentPosition);
+  window.addEventListener('pageshow', event => { if (event.persisted) smoothScroll?.resize(); });
+  document.addEventListener('keydown', event => {
+    if (['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key)
+        && !event.target.closest('input,textarea,select,[contenteditable]')) stopAtCurrentPosition();
+  });
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!smoothScroll || !link || event.defaultPrevented || event.button !== 0
+        || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey
+        || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+    const url = new URL(link.href);
+    if (url.origin !== location.origin || url.pathname !== location.pathname || !url.hash) return;
+    let id;
+    try { id = decodeURIComponent(url.hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    if (!target) return;
+    event.preventDefault();
+    history.pushState(null, '', url.hash);
+    // #top is the sticky header: its live rect stays at y=0 even at the footer.
+    smoothScroll.scrollTo(id === 'top' ? 0 : target, {
+      onStart: wakeScroll,
+      onComplete: () => {
+        // Keep anchor navigation useful for keyboard and screen reader users.
+        const temporary = !target.hasAttribute('tabindex');
+        if (temporary) target.setAttribute('tabindex', '-1');
+        target.focus({ preventScroll: true });
+        if (temporary) target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true });
+      }
+    });
+  });
+
   const copy = document.querySelector('[data-copy-email]');
   if (copy) copy.addEventListener('click', async () => {
     const label = copy.querySelector('span');

@@ -6,8 +6,8 @@ Editable static website, improved from the original Mdihni-Advisory-Website proj
 - Shared styling in `assets/styles.css`, `assets/refinements.css`, `assets/theme-dark.css`, `assets/polish.css`.
 - Accessible language links work without JavaScript, cookies or browser storage.
 - The email composer opens the visitor's email application or copies a message. It does not send or store submissions.
-- Local fonts and optimized imagery; no external trackers or runtime libraries.
-- Layered entry, staggered reveals, pointer depth, gentle parallax and native page transitions respect the reduced-motion device preference. See `POLISH-NL.md` for edition 5 design and validation.
+- Local fonts, optimized imagery and a pinned local Lenis 1.3.26 copy; no CDN requests or trackers.
+- Gentler font-ready text entrances, stable decorative detail, staggered reveals, wheel easing and native crossfades respect the reduced-motion preference. See `SMOOTH-MOTION-NL.md` for edition 6 and `POLISH-NL.md` for the previous edition.
 
 ## Run locally
 

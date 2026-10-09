@@ -1,5 +1,7 @@
 # Versie 5 — verfijnde beweging en een heldere start
 
+Historische beschrijving van versie 5. De actuele motionaanpassingen staan in `SMOOTH-MOTION-NL.md` (versie 6).
+
 Deze versie verfijnt de bestaande donkere website, met dezelfde pagina's, logo's, diensten en Nederlandse en Engelse taalkeuze.
 
 ## Vormgeving en animaties
