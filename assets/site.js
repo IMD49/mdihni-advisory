@@ -52,9 +52,9 @@
   Promise.all([document.fonts.load('600 64px Manrope'), document.fonts.load('italic 500 64px Cormorant')])
     .then(() => document.fonts.ready).catch(() => {}).then(beginEntry);
   // Reveal text and cards individually, rather than moving whole sections and their children twice.
-  const revealCandidates = [...document.querySelectorAll('.section-heading,.section-head-row,.three-pillar article,.service-tile,.approach-layout>div:first-child,.about-teaser-text,.cta-inner,.detail-card,.method-list article,.values-grid article,.contact-info,.contact-panel,.approach-steps>div,.founding-note,.first-conversation')];
+  const revealCandidates = [...document.querySelectorAll('.section-heading,.section-head-row,.three-pillar article,.service-tile,.approach-layout>div:first-child,.about-teaser-text,.cta-inner,.detail-card,.method-list article,.values-grid article,.contact-info,.contact-panel,.approach-steps>div,.founding-note,.first-conversation,.editorial-heading,.focus-row,.team-copy,.workspace-copy,.compact-steps article')];
   const revealElements = revealCandidates.filter(element => !revealCandidates.some(parent => parent !== element && parent.contains(element)));
-  document.querySelectorAll('.three-pillar,.services-grid,.approach-steps,.values-grid,.method-list,.engagement-principles').forEach(group => {
+  document.querySelectorAll('.three-pillar,.services-grid,.approach-steps,.values-grid,.method-list,.engagement-principles,.focus-grid,.compact-steps').forEach(group => {
     [...group.children].forEach((item, index) => item.style.setProperty('--reveal-delay', `${Math.min(index * 70, 210)}ms`));
   });
   let revealObserver;
@@ -204,6 +204,10 @@
     const status = document.getElementById('form-status');
     let preparedMessage = '';
     copyMessage.hidden = false;
+    // A previous copy confirmation should not remain after the enquiry changes.
+    const clearStatus = () => { status.textContent = ''; };
+    form.addEventListener('input', clearStatus);
+    form.addEventListener('change', clearStatus);
     const prepare = () => {
       const data = new FormData(form);
       const name = String(data.get('name') || '').trim();
